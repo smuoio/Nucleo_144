@@ -249,10 +249,10 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of ControlTrask */
-  ControlTraskHandle = osThreadNew(MainControl, NULL, &ControlTrask_attributes);
+  //ControlTraskHandle = osThreadNew(MainControl, NULL, &ControlTrask_attributes);
 
   /* creation of DiagnosticTask */
-  DiagnosticTaskHandle = osThreadNew(MainDiagnostic, NULL, &DiagnosticTask_attributes);
+  //DiagnosticTaskHandle = osThreadNew(MainDiagnostic, NULL, &DiagnosticTask_attributes);
 
   /* creation of ConsoleTask */
 //  ConsoleTaskHandle = osThreadNew(MainConsoleTask, NULL, &ConsoleTask_attributes);
@@ -536,9 +536,12 @@ void StartDefaultTask(void const * argument)
   /* Infinite loop */
   char *msg = "StartDefaultTask!\n\r";
  // HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
+  ControlTraskHandle = osThreadNew(MainControl, NULL, &ControlTrask_attributes);
   for(;;)
   {
-	osDelay(1);
+	//call a configuration function!!!
+	  osDelay(10);
+	osThreadExit();  
   }
   /* USER CODE END 5 */
 }
@@ -556,6 +559,7 @@ void MainControl(void const * argument)
   /* Infinite loop */
   char *msg = "MainControlTask!\n\r";
  // HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
+ DiagnosticTaskHandle = osThreadNew(MainDiagnostic, NULL, &DiagnosticTask_attributes);
   for(;;)
   {
 	  // entry mutex
@@ -586,7 +590,9 @@ void MainDiagnostic(void const * argument)
   /* Infinite loop */
   for(;;)
   {
+    osMutexWait(DiagnosticMutexHandle, 0);
     osDelay(200);
+    osRelease(DiagnosticMutexHandle);
   }
   /* USER CODE END MainDiagnostic */
 }
