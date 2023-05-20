@@ -19,9 +19,13 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "main.h"
 #include "cmsis_os.h"
+#include "fatfs.h"
 #include "Util.h"
+#include "Config.h"
 #include "LedManager.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -47,6 +51,8 @@
 ETH_HandleTypeDef heth;
 
 UART_HandleTypeDef huart3;
+
+SPI_HandleTypeDef hspi2;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
@@ -165,6 +171,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_ETH_Init(void);
+static void MX_SPI2_Init(void);
 void StartDefaultTask(void const * argument);
 void MainControl(void const * argument);
 void MainDiagnostic(void const * argument);
@@ -208,8 +215,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART3_UART_Init();
+  MX_SPI2_Init();
+  MX_FATFS_Init();
  // MX_USB_OTG_FS_PCD_Init();
  // MX_ETH_Init();
+  ConfigInit(); // configuration init
+
   /* USER CODE BEGIN 2 */
   /* Create the mutex(es) */
   /* definition and creation of EthMutex */
@@ -226,7 +237,7 @@ int main(void)
   DiagnosticMutexHandle = osMutexNew(&DiagnosticMutex_attributes);
 
   /* creation of ConsoleMutex */
- // ConsoleMutexHandle = osMutexNew(&ConsoleMutex_attributes);
+  ConsoleMutexHandle = osMutexNew(&ConsoleMutex_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -390,6 +401,46 @@ static void MX_ETH_Init(void)
 }
 
 /**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 7;
+  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
   * @brief USART3 Initialization Function
   * @param None
   * @retval None
@@ -535,13 +586,14 @@ void StartDefaultTask(void const * argument)
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
   char *msg = "StartDefaultTask!\n\r";
- // HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
-  ControlTraskHandle = osThreadNew(MainControl, NULL, &ControlTrask_attributes);
+  HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
   for(;;)
   {
-	//call a configuration function!!!
-	  osDelay(10);
-	osThreadExit();  
+	  ControlTraskHandle = osThreadNew(MainControl, NULL, &ControlTrask_attributes);
+	  HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
+	  osDelay(1);
+	  osThreadExit();
+	  //Terminate the task
   }
   /* USER CODE END 5 */
 }
@@ -558,8 +610,8 @@ void MainControl(void const * argument)
   /* USER CODE BEGIN MainControl */
   /* Infinite loop */
   char *msg = "MainControlTask!\n\r";
- // HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
- DiagnosticTaskHandle = osThreadNew(MainDiagnostic, NULL, &DiagnosticTask_attributes);
+  HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
+  DiagnosticTaskHandle = osThreadNew(MainDiagnostic, NULL, &DiagnosticTask_attributes);
   for(;;)
   {
 	  // entry mutex
@@ -567,6 +619,7 @@ void MainControl(void const * argument)
 	//set a pin to verify the right works
 	HAL_GPIO_TogglePin(PinDebug_GPIO_Port, PinDebug_Pin);
 	HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+	//HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
     osDelay(50);
     osMutexRelease(ControlMutexHandle);
      // exit mutex
@@ -584,15 +637,16 @@ void MainControl(void const * argument)
 void MainDiagnostic(void const * argument)
 {
   /* USER CODE BEGIN MainDiagnostic */
-	  char *msg = "MainDiagnosticTask!\n\r";
-	  HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
-
+  char *msg = "MainDiagnosticTask!\n\r";
+  HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
+  ConsoleTaskHandle = osThreadNew(MainConsoleTask, NULL, &ConsoleTask_attributes);
   /* Infinite loop */
   for(;;)
   {
-    osMutexWait(DiagnosticMutexHandle, 0);
+	osMutexWait(DiagnosticMutexHandle, 0);
+	HAL_GPIO_TogglePin(LED2_GPIO_Port, LED2_Pin);
     osDelay(200);
-    osRelease(DiagnosticMutexHandle);
+    osMutexRelease(DiagnosticMutexHandle);
   }
   /* USER CODE END MainDiagnostic */
 }
@@ -607,10 +661,15 @@ void MainDiagnostic(void const * argument)
 void MainConsoleTask(void const * argument)
 {
   /* USER CODE BEGIN MainConsoleTask */
+  char *msg = "MainConsoleTask!\n\r";
+  HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 0xFFFF);
   /* Infinite loop */
   for(;;)
   {
-    osDelay(500);
+	  osMutexWait(ConsoleMutexHandle, 0);
+	  HAL_GPIO_TogglePin(LED3_GPIO_Port, LED3_Pin);
+	  osDelay(500);
+	  osMutexRelease(ConsoleMutexHandle);
   }
   /* USER CODE END MainConsoleTask */
 }
